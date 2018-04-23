@@ -1,0 +1,93 @@
+---
+resources:
+- type: compute.v1.network
+  name: gce-network
+  properties:
+    name: gce-network
+    IPv4Range: 10.200.0.0/16
+    routingConfig:
+      routingMode: GLOBAL
+- type: compute.v1.firewall
+  name: gce-network-allow-ssh
+  properties:
+    name: gce-network-allow-ssh
+    network: $(ref.gce-network.selfLink)
+    allowed:
+      - IPProtocol: tcp
+        ports: 
+          - "22"
+- type: compute.v1.firewall
+  name: gce-network-allow-internal
+  properties:
+    name: gce-network-allow-internal 
+    network: $(ref.gce-network.selfLink)
+    sourceRanges:
+      - 10.200.0.0/16
+    allowed:
+      - IPProtocol: tcp
+        ports: 
+          - "1-65535"
+      - IPProtocol: udp
+        ports: 
+          - "1-65535"
+      - IPProtocol: icmp
+- type: compute.v1.instance
+  name: nat-gateway
+  properties:
+    name: nat-gateway
+    tags:
+      items:
+        - nat
+    zone: us-east1-b
+    machineType: zones/us-east1-b/machineTypes/f1-micro
+    canIpForward: true
+    networkInterfaces:
+      - network: $(ref.gce-network.selfLink)
+        accessConfigs:
+          - name: NAT
+            type: ONE_TO_ONE_NAT
+    disks:
+      - deviceName: boot
+        type: PERSISTENT
+        boot: true
+        autoDelete: true
+        initializeParams:
+          sourceImage: projects/centos-cloud/global/images/family/centos-7
+    metadata:
+      items:
+        - key: startup-script
+          value: |
+            #!/bin/bash
+            sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+            iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+- type: compute.v1.instance
+  name: example-instance
+  properties:
+    name: example-instance
+    tags:
+      items:
+        - no-ip
+    zone: us-east1-b
+    machineType: zones/us-east1-b/machineTypes/f1-micro
+    canIpForward: true
+    networkInterfaces:
+      - network: $(ref.gce-network.selfLink)
+    disks:
+      - deviceName: boot
+        type: PERSISTENT
+        boot: true
+        autoDelete: true
+        initializeParams:
+          sourceImage: projects/centos-cloud/global/images/family/centos-7
+- type: compute.v1.route
+  name: no-ip-internet-route
+  properties:
+    name: no-ip-internet-route
+    network: $(ref.gce-network.selfLink)
+    tags:
+      - no-ip
+    destRange: 0.0.0.0/0
+    priority: 800
+    nextHopInstance: $(ref.nat-gateway.selfLink)
+
+

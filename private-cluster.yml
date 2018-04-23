@@ -1,5 +1,11 @@
 ---
 resources:
+- type: compute.v1.address
+  name: gce-network-ip
+  properties:
+    name: gce-network-ip
+    addressType: EXTERNAL
+    region: us-east1
 - type: compute.v1.network
   name: gce-network
   properties:
@@ -46,6 +52,7 @@ resources:
         accessConfigs:
           - name: NAT
             type: ONE_TO_ONE_NAT
+            natIP: $(ref.gce-network-ip.address)
     disks:
       - deviceName: boot
         type: PERSISTENT
